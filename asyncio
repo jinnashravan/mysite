@@ -1,0 +1,53 @@
+import asyncio
+import time
+import random
+from typing import AsyncGenerator, Tuple, MutableMapping
+
+Image = str
+Tag = int
+
+async def call_detector(_img: Image) -> Image:
+    await asyncio.sleep(1)
+    return ""
+
+async def call_cv_box(_img: Image) -> AsyncGenerator[Tuple[Image, Tag], None]:
+    for i in range(5):
+        yield str(i), i
+
+async def call_ocr(_img:Image, tag: Tag, cb) -> str:
+    await asyncio.sleep(5-tag)
+    return cb(f'extracted {random.randint(0, 100)} for field {tag}')
+
+def process_one(img: Image, tag: Tag, res_cb):
+    return asyncio.create_task(
+        call_ocr(img, tag, res_cb)
+    )
+
+async def fake_orchestrator(img: Image):
+    segmentation_mask: Image = await call_detector(img)
+    field_boxes: AsyncGenerator[Tuple[Image, Tag]] = call_cv_box(segmentation_mask)
+    res: MutableMapping[Tag, str] = {}
+    tasks = []
+    async for i, t in field_boxes:
+        def _gather_result(prediction, t=t):
+            res[t] = prediction
+        tasks.append(process_one(i, t, _gather_result))
+
+    await asyncio.wait(tasks)
+    return res
+
+
+async def main(a_parameter):
+    ciao = await fake_orchestrator(a_parameter)
+    print(a_parameter, ciao)
+    return ciao
+
+
+async def call_main_several_times():
+    tasks = [asyncio.create_task(main(f'extraction #{i+1}')) for i in range(10)]
+    await asyncio.wait(tasks)
+
+s = time.perf_counter()
+asyncio.run(call_main_several_times())
+elapsed = time.perf_counter() - s
+print(f"{__file__} executed in {elapsed:0.2f} seconds.")
